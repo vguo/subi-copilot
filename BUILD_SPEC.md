@@ -298,50 +298,49 @@ Call the `record_handoff` tool with a single `patients` array. Do not return pro
 
 ## 8. The extraction module
 
-`src/extract.py`. Calls Anthropic with tool-use, caches result to disk.
+`src/extract.py`. Pluggable across two LLM providers (Claude / Gemini) behind a single interface, caches result to disk.
 
 **Key design choices:**
 
-- **Tool-use, not "return JSON" in prose.** The Anthropic API gets a `tools=[...]` parameter where the tool's `input_schema` is `HandoffExtraction.model_json_schema()`. We `tool_choice={"type": "tool", "name": "record_handoff"}` to force the model to call the tool. This is dramatically more reliable than asking the model to emit JSON in a code block. The tool input is already-validated structured data; we feed it to `HandoffExtraction.model_validate(tool_use_block.input)`.
+- **Pluggable provider via a `Literal["claude", "gemini"]` argument.** Public API: `extract_handoff_cached(transcript, *, provider="claude", force_fresh=False)` and `is_cached(transcript, *, provider="claude")`. Internally branches to `_extract_via_claude` or `_extract_via_gemini`. Default is Claude (proven quality); Gemini is the cost-saving alternative on the free AI Studio tier.
 
-- **Disk cache keyed by hash(model + prompt + schema + transcript).** SHA256 of all four concatenated with `\x1f` separator, take first 16 hex chars. Write extraction JSON to `.cache/extractions/<key>.json`. Auto-invalidates when prompt, schema, model, or transcript changes. No manual cache-busting needed.
+- **Structured output is provider-native, not prompt-engineered.**
+  - **Claude:** tool-use. Pass `tools=[{"name": "record_handoff", "input_schema": HandoffExtraction.model_json_schema()}]` plus `tool_choice={"type": "tool", "name": "record_handoff"}`. The model fills the tool input; we feed it to `HandoffExtraction.model_validate(tool_use_block.input)`. Dramatically more reliable than "return JSON" in prose.
+  - **Gemini:** `response_schema` + `response_mime_type="application/json"`. Pass the Pydantic class directly as `response_schema=HandoffExtraction`; the SDK either populates `response.parsed` with an instance or returns JSON in `response.text` that we parse via `HandoffExtraction.model_validate_json()`. Both fallback paths are in the code because `response.parsed` is sometimes `None` depending on response shape.
 
-- **`is_cached(transcript) -> bool`** is a sibling helper so the UI can show "cached/free" vs "fresh/~$0.04" hints *before* the user clicks the button.
+- **Disk cache keyed by hash(model + prompt + schema + transcript).** SHA256 of all four concatenated with `\x1f` separator, take first 16 hex chars. Write extraction JSON to `.cache/extractions/<key>.json`. **Provider switching gets a separate cache namespace for free** because the model string is the first component of the hash — `claude-sonnet-4-5` and `gemini-1.5-flash` produce different keys without any explicit "provider" slot. Auto-invalidates when prompt, schema, model, or transcript changes. No manual cache-busting needed.
+
+- **`is_cached(transcript, *, provider=...) -> bool`** is a sibling helper so the UI can show "cached/free" vs "fresh/paid" or "fresh/free" hints *before* the user clicks the button. The provider matters because each provider has its own cache.
 
 - **`force_fresh=True` parameter** to bypass cache without changing the transcript. Useful for prompt iteration.
 
-- **Model: `claude-sonnet-4-5`** is the right tier — fast, cheap, clean structured output. Don't use Opus for this.
+- **Model defaults:** `CLAUDE_MODEL = "claude-sonnet-4-5"`, `GEMINI_MODEL = "gemini-1.5-flash"`. Both are the right tier for extraction on their respective platforms: fast, cheap, clean structured output.
+
+- **Lazy import of `google.genai`** inside `_extract_via_gemini`. Users who only ever use Claude don't pay the import cost and don't fail on app start if `google-genai` isn't installed.
 
 ```python
-EXTRACTION_MODEL = "claude-sonnet-4-5"
+LLMProvider = Literal["claude", "gemini"]
+CLAUDE_MODEL = "claude-sonnet-4-5"
+GEMINI_MODEL = "gemini-1.5-flash"
 
-def _cache_key(transcript: str) -> str:
+def _model_for_provider(provider: LLMProvider) -> str:
+    return {"claude": CLAUDE_MODEL, "gemini": GEMINI_MODEL}[provider]
+
+def _cache_key(transcript: str, provider: LLMProvider) -> str:
+    model = _model_for_provider(provider)
     schema_str = json.dumps(HandoffExtraction.model_json_schema(), sort_keys=True)
-    prompt = _load_prompt()
-    blob = f"{EXTRACTION_MODEL}\x1f{schema_str}\x1f{prompt}\x1f{transcript}"
+    blob = f"{model}\x1f{schema_str}\x1f{_load_prompt()}\x1f{transcript}"
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
-def extract_handoff(transcript, *, client=None) -> HandoffExtraction:
-    client = client or Anthropic()
-    response = client.messages.create(
-        model=EXTRACTION_MODEL,
-        max_tokens=8000,
-        system=_load_prompt(),
-        tools=[{
-            "name": "record_handoff",
-            "description": "Record the structured handoff extraction for one or more patients.",
-            "input_schema": HandoffExtraction.model_json_schema(),
-        }],
-        tool_choice={"type": "tool", "name": "record_handoff"},
-        messages=[{"role": "user", "content": transcript}],
-    )
-    tool_use_block = next((b for b in response.content if b.type == "tool_use"), None)
-    if tool_use_block is None:
-        raise ValueError("Extraction model did not call the record_handoff tool.")
-    return HandoffExtraction.model_validate(tool_use_block.input)
+def extract_handoff(transcript, *, provider="claude", client=None) -> HandoffExtraction:
+    if provider == "claude":
+        return _extract_via_claude(transcript, client=client)
+    if provider == "gemini":
+        return _extract_via_gemini(transcript)
+    raise ValueError(f"Unknown provider: {provider!r}")
 ```
 
-`load_dotenv()` is called at module import so the Anthropic SDK finds `ANTHROPIC_API_KEY` in `os.environ`.
+`load_dotenv()` is called at module import so the Anthropic and google-genai SDKs find `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` in `os.environ`. The app.py-side secrets bridge writes `st.secrets` values into the same env vars on Streamlit Cloud.
 
 ---
 
@@ -615,16 +614,26 @@ Two buttons:
 
 Both buttons call `extract_handoff_cached(transcript, force_fresh=...)`, then `render_sheet(extraction)`, then store everything in session state along with elapsed ms and cache-hit-before flag.
 
-### Step 3: one-pager output
+### Step 3: view handoff (three tabs)
 
 Shown only if both `extraction` and `html_out` are populated. Three metric tiles (`st.columns(3)` + `st.metric`):
 - Patients extracted
 - Latency (ms)
 - Source ("cache hit" or "fresh extraction")
 
-Then `st.components.v1.html(html_out, height=1100, scrolling=True)` for inline preview.
+Below the metrics, three view tabs over the same extraction:
 
-Two download buttons side by side: HTML one-pager, raw extraction JSON (`extraction.model_dump_json(indent=2)`).
+```python
+view_tabs = st.tabs(["Print sheet", "Shift mode", "Timeline"])
+```
+
+**Print sheet** — `st.components.v1.html(html_out, height=1100, scrolling=True)` for inline preview of the 6-card HTML. Two download buttons: HTML one-pager and raw extraction JSON (`extraction.model_dump_json(indent=2)`).
+
+**Shift mode** — per-patient mobile-friendly checklist. Single-column markdown layout: patient identifier as `##` heading, severity icon (🟢 stable / 🟡 watcher / 🔴 unstable) + code status, italic one-liner, "Today" bullets, "Exam" inline, **checkable tasks** sorted by `TaskTiming` order, prominent ⚠️ "If / Then" contingencies, and a collapsible "Meds · Pending · Gaps" expander. Prev/Next buttons and a selectbox navigate between patients. Patient index is bounds-checked against `len(extraction.patients)` so re-extraction doesn't leave the cursor pointing at a missing patient.
+
+**Timeline** — cross-patient checklist grouped by `TaskTiming` bucket. Iterates `_TIMING_DISPLAY` in shift order (`Now / start of shift`, `22:00 — pre-bed pass`, `00:00 — midnight checks`, `04:00 — AM labs`, `Pre-rounds`, `PRN`, `Anytime / standing`). Each task is prefixed with the patient's short identifier in brackets, e.g. `[Aisha Morgan] Draw BMP`.
+
+**The key invariant: Shift mode and Timeline share checkbox state.** Both use the same `_task_key(fp, patient_idx, task_idx)` for `st.checkbox`'s `key` argument, where `fp` is a SHA256-prefix fingerprint of the extraction JSON. Checking a task in one view is checked in the other. When the extraction changes (re-extract, apply edits, switch to demo data), the fingerprint changes, so stale checkbox state is naturally abandoned rather than mis-mapping onto a different task list — no manual cleanup needed.
 
 ### Step 4: edit cards
 
@@ -747,6 +756,14 @@ Thumbs.db
 9. **"Missing X" noise in red.** Earlier `completeness_gaps` flagged every absent field. Tightened in the schema description AND the prompt to only flag clinically significant gaps. Both edits are necessary — Pydantic field descriptions get used by the model via tool-use.
 
 10. **Pasted API key in chat.** If a user pastes their key, treat it as leaked. Walk through key rotation immediately. Never use the value.
+
+11. **Stale checkbox state after re-extraction.** Shift mode and Timeline both use `st.checkbox` keys keyed on `(extraction_fingerprint, patient_idx, task_idx)`. The fingerprint prefix is non-negotiable — without it, an old check on "Patient 0 task 2" silently re-applies to a new extraction's "Patient 0 task 2" even though they're different tasks. The fingerprint is `sha256(extraction.model_dump_json())[:8]`; any change to the extraction yields a new namespace and clean state.
+
+12. **Shift mode `shift_idx` out of bounds after re-extraction.** If the user is on patient 4 of 5 and re-extracts to a 3-patient result, `shift_idx=4` is now invalid. Bounds-check on every render: `if "shift_idx" not in st.session_state or st.session_state.shift_idx >= n: st.session_state.shift_idx = 0`.
+
+13. **Gemini `response.parsed` is sometimes `None`.** The `google-genai` SDK populates `response.parsed` with an instance of your `response_schema` class *most* of the time, but not always — sometimes it leaves it `None` and you have to parse `response.text` yourself. `_extract_via_gemini` handles both: it tries `response.parsed` first, then falls back to `HandoffExtraction.model_validate_json(response.text)`. Don't simplify this to one path; the fallback fires in production.
+
+14. **Gemini free tier data retention.** Google's AI Studio free tier may use prompts for product improvement. Paid Gemini API tier does not. This matters even with synthetic-data-only data because your *prompt design* becomes training signal. The sidebar tooltip flags this; the synthetic-data-only banner is non-negotiable regardless.
 
 ---
 

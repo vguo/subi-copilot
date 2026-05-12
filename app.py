@@ -34,6 +34,8 @@ import streamlit as st
 try:
     if "ANTHROPIC_API_KEY" in st.secrets:
         os.environ.setdefault("ANTHROPIC_API_KEY", st.secrets["ANTHROPIC_API_KEY"])
+    if "GEMINI_API_KEY" in st.secrets:
+        os.environ.setdefault("GEMINI_API_KEY", st.secrets["GEMINI_API_KEY"])
 except Exception:
     # No secrets.toml — fine, we'll rely on .env via load_dotenv() in extract.py
     pass
@@ -93,6 +95,27 @@ _init_state()
 
 with st.sidebar:
     st.header("Settings")
+
+    # LLM provider — toggles between paid Claude (high quality) and the free
+    # Gemini tier (AI Studio). Cache key includes the provider's model
+    # string, so switching providers caches independently.
+    provider = st.selectbox(
+        "LLM provider",
+        options=["claude", "gemini"],
+        index=0,
+        format_func=lambda x: {
+            "claude": "Claude Sonnet (paid, ~$0.04/patient)",
+            "gemini": "Gemini 1.5 Flash (free, AI Studio)",
+        }[x],
+        key="llm_provider",
+        help=(
+            "**Claude:** highest extraction quality; paid (~$0.04/patient).\n\n"
+            "**Gemini:** free within AI Studio limits (15 RPM, ~1500 req/day). "
+            "Note: free tier may use prompts for product improvement. "
+            "Synthetic data only, as always."
+        ),
+    )
+
     model_size = st.selectbox(
         "Whisper model size",
         options=["tiny", "base", "small", "medium"],
@@ -111,7 +134,8 @@ with st.sidebar:
     st.markdown(
         "**Cost notes:**\n"
         "- Transcription: local, free.\n"
-        "- Extraction: ~$0.04/patient via Claude API.\n"
+        "- Extraction (Claude): ~$0.04/patient.\n"
+        "- Extraction (Gemini Flash): free within AI Studio limits.\n"
         "- Re-extracting the same transcript: cached on disk, free."
     )
 
@@ -428,7 +452,16 @@ if st.session_state.transcript:
 
     col_a, col_b = st.columns([1, 1])
     with col_a:
-        cached_hint = "(cached — free)" if is_cached(st.session_state.transcript) else "(fresh — ~$0.04/patient)"
+        # Hint reflects both cache status and which provider would be called.
+        # Cache is per-provider, so the hint can flip when the sidebar selector
+        # changes even though the transcript text is unchanged.
+        provider = st.session_state.llm_provider
+        if is_cached(st.session_state.transcript, provider=provider):
+            cached_hint = "(cached — free)"
+        elif provider == "gemini":
+            cached_hint = "(fresh — free via Gemini)"
+        else:
+            cached_hint = "(fresh — ~$0.04/patient)"
         extract_clicked = st.button(
             f"Extract + Render {cached_hint}",
             type="primary",
@@ -442,12 +475,18 @@ if st.session_state.transcript:
         )
 
     if extract_clicked or force_fresh:
+        provider = st.session_state.llm_provider
         try:
-            with st.spinner("Calling Claude for extraction..."):
+            with st.spinner(f"Calling {provider.title()} for extraction..."):
                 t_start = time.perf_counter()
-                cache_hit_before = is_cached(st.session_state.transcript) and not force_fresh
+                cache_hit_before = (
+                    is_cached(st.session_state.transcript, provider=provider)
+                    and not force_fresh
+                )
                 extraction = extract_handoff_cached(
-                    st.session_state.transcript, force_fresh=force_fresh
+                    st.session_state.transcript,
+                    provider=provider,
+                    force_fresh=force_fresh,
                 )
                 elapsed_ms = int((time.perf_counter() - t_start) * 1000)
                 st.session_state.extraction = extraction
