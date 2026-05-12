@@ -132,7 +132,7 @@ with st.sidebar:
     )
     st.markdown("---")
     st.header("Session")
-    if st.button("Start over", use_container_width=True):
+    if st.button("Start over", width="stretch"):
         _reset_state()
         st.rerun()
     st.markdown("---")
@@ -259,8 +259,36 @@ def _render_task_checkbox(
     )
 
 
+def _shift_prev() -> None:
+    """Callback: move to the previous patient in Shift mode."""
+    st.session_state.shift_idx -= 1
+
+
+def _shift_next() -> None:
+    """Callback: move to the next patient in Shift mode."""
+    st.session_state.shift_idx += 1
+
+
+def _on_shift_picker_changed() -> None:
+    """Callback: selectbox changed -> copy its value to the source of truth.
+
+    Streamlit fires this *before* the rerun, so by the time the page re-
+    renders, `shift_idx` already matches the picker's new selection.
+    """
+    st.session_state.shift_idx = st.session_state["shift_picker"]
+
+
 def _render_shift_mode_tab(extraction: HandoffExtraction) -> None:
-    """Per-patient checklist view. Designed to be readable one-handed."""
+    """Per-patient checklist view. Designed to be readable one-handed.
+
+    State design (same pattern as the task checkboxes):
+    - `shift_idx` is the source of truth for which patient is shown.
+    - `shift_picker` is the selectbox's widget key. Streamlit stores its
+      own value under widget keys and prefers it over external `index=`,
+      so we force-sync `shift_picker` from `shift_idx` before render.
+    - Prev/Next buttons modify `shift_idx` via on_click callbacks
+      (Streamlit reruns automatically — no explicit st.rerun() needed).
+    """
     fp = _extraction_fingerprint(extraction)
     n = len(extraction.patients)
 
@@ -268,38 +296,38 @@ def _render_shift_mode_tab(extraction: HandoffExtraction) -> None:
     if "shift_idx" not in st.session_state or st.session_state.shift_idx >= n:
         st.session_state.shift_idx = 0
 
+    # Force-sync the selectbox's widget state from the source of truth
+    # BEFORE the selectbox renders. Without this, the selectbox's stored
+    # widget state would override our shift_idx changes from button clicks.
+    st.session_state["shift_picker"] = st.session_state.shift_idx
+
     # Navigation row: prev / picker / next
     nav_cols = st.columns([1, 4, 1])
     with nav_cols[0]:
-        if st.button(
+        st.button(
             "← Prev",
-            use_container_width=True,
+            width="stretch",
             disabled=st.session_state.shift_idx == 0,
             key="shift_prev",
-        ):
-            st.session_state.shift_idx -= 1
-            st.rerun()
-    with nav_cols[1]:
-        picked = st.selectbox(
-            "Patient",
-            range(n),
-            index=st.session_state.shift_idx,
-            format_func=lambda i: f"{i+1}/{n} — {extraction.patients[i].identifier}",
-            key="shift_picker",
-            label_visibility="collapsed",
+            on_click=_shift_prev,
         )
-        if picked != st.session_state.shift_idx:
-            st.session_state.shift_idx = picked
-            st.rerun()
+    with nav_cols[1]:
+        st.selectbox(
+            "Patient",
+            list(range(n)),
+            key="shift_picker",
+            format_func=lambda i: f"{i+1}/{n} — {extraction.patients[i].identifier}",
+            label_visibility="collapsed",
+            on_change=_on_shift_picker_changed,
+        )
     with nav_cols[2]:
-        if st.button(
+        st.button(
             "Next →",
-            use_container_width=True,
+            width="stretch",
             disabled=st.session_state.shift_idx == n - 1,
             key="shift_next",
-        ):
-            st.session_state.shift_idx += 1
-            st.rerun()
+            on_click=_shift_next,
+        )
 
     pi = st.session_state.shift_idx
     p = extraction.patients[pi]
@@ -527,12 +555,12 @@ if st.session_state.transcript:
         extract_clicked = st.button(
             f"Extract + Render {cached_hint}",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
     with col_b:
         force_fresh = st.button(
             "Re-extract (force fresh API call)",
-            use_container_width=True,
+            width="stretch",
             help="Bypass the cache. Useful if you just changed the prompt or want to retry.",
         )
 
@@ -598,7 +626,7 @@ if st.session_state.extraction is not None and st.session_state.html_out is not 
                 data=st.session_state.html_out,
                 file_name="one_pager.html",
                 mime="text/html",
-                use_container_width=True,
+                width="stretch",
             )
         with col_d2:
             st.download_button(
@@ -606,7 +634,7 @@ if st.session_state.extraction is not None and st.session_state.html_out is not 
                 data=extraction.model_dump_json(indent=2),
                 file_name="extraction.json",
                 mime="application/json",
-                use_container_width=True,
+                width="stretch",
             )
 
     with view_tabs[1]:
@@ -670,7 +698,7 @@ if st.session_state.extraction is not None and st.session_state.html_out is not 
                         "description", required=True
                     ),
                 },
-                use_container_width=True,
+                width="stretch",
             )
 
             st.markdown("**Contingencies** (if/then)")
@@ -685,7 +713,7 @@ if st.session_state.extraction is not None and st.session_state.html_out is not 
                     "trigger": st.column_config.TextColumn("if (trigger)", required=True),
                     "action": st.column_config.TextColumn("then (action)", required=True),
                 },
-                use_container_width=True,
+                width="stretch",
             )
 
             # Rebuild patient from edits. Meds + confidence_flags + completeness_gaps
