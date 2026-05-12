@@ -202,14 +202,61 @@ def _short_id(identifier: str) -> str:
     return identifier
 
 
-def _task_key(fp: str, patient_idx: int, task_idx: int) -> str:
-    """Stable session-state key for a task's checkbox.
+def _task_state_key(fp: str, patient_idx: int, task_idx: int) -> str:
+    """Shared cross-view state slot for whether a task is checked.
 
-    The fingerprint prefix means re-extraction invalidates old state; the
-    (patient_idx, task_idx) suffix means Shift mode and Timeline view share
-    the same key for the same task and thus the same checkbox state.
+    Both Shift mode and Timeline read from / write to this slot, so
+    checking a task in one view also checks it in the other. This is NOT
+    a widget key — Streamlit widget keys must be unique per element across
+    the whole rendered page, even across tabs.
     """
-    return f"chk_{fp}_{patient_idx}_{task_idx}"
+    return f"task_state_{fp}_{patient_idx}_{task_idx}"
+
+
+def _task_widget_key(view: str, fp: str, patient_idx: int, task_idx: int) -> str:
+    """Per-view unique key for the Streamlit checkbox widget.
+
+    Streamlit pre-renders all tabs (not lazily), so a duplicate `key` across
+    two tabs raises `StreamlitDuplicateElementKey`. We namespace by `view`
+    ("shift" or "timeline") to keep widget keys unique; shared state lives
+    separately under `_task_state_key`.
+    """
+    return f"chk_{view}_{fp}_{patient_idx}_{task_idx}"
+
+
+def _on_task_toggled(view: str, fp: str, patient_idx: int, task_idx: int) -> None:
+    """Callback: copy this view's widget value into the shared state slot.
+
+    Fires when the user clicks a checkbox. After it runs, Streamlit reruns
+    the script — both views re-render and each pulls the new value from the
+    shared state slot via `_render_task_checkbox`.
+    """
+    state_key = _task_state_key(fp, patient_idx, task_idx)
+    widget_key = _task_widget_key(view, fp, patient_idx, task_idx)
+    st.session_state[state_key] = st.session_state[widget_key]
+
+
+def _render_task_checkbox(
+    label: str, view: str, fp: str, patient_idx: int, task_idx: int
+) -> None:
+    """Render a checkbox that syncs to the shared cross-view state slot.
+
+    On each render, we force-copy the shared state value into the widget's
+    own session_state slot BEFORE the checkbox renders. That makes the
+    widget display the current shared value (potentially updated from the
+    other view since last render), even though Streamlit's default behavior
+    would otherwise prefer the widget's own remembered value.
+    """
+    state_key = _task_state_key(fp, patient_idx, task_idx)
+    widget_key = _task_widget_key(view, fp, patient_idx, task_idx)
+    # Force-sync: shared slot -> widget slot, before the widget renders.
+    st.session_state[widget_key] = st.session_state.get(state_key, False)
+    st.checkbox(
+        label,
+        key=widget_key,
+        on_change=_on_task_toggled,
+        args=(view, fp, patient_idx, task_idx),
+    )
 
 
 def _render_shift_mode_tab(extraction: HandoffExtraction) -> None:
@@ -284,9 +331,14 @@ def _render_shift_mode_tab(extraction: HandoffExtraction) -> None:
             key=lambda x: _TIMING_ORDER_IDX.get(x[1].when, 99),
         )
         for ti, t in sorted_tasks:
-            key = _task_key(fp, pi, ti)
             when_str = f"`{t.when.value}` " if t.when != TaskTiming.ANYTIME else ""
-            st.checkbox(f"{when_str}{t.description}", key=key)
+            _render_task_checkbox(
+                f"{when_str}{t.description}",
+                view="shift",
+                fp=fp,
+                patient_idx=pi,
+                task_idx=ti,
+            )
 
     # Contingencies — prominent, since these are the watch-outs
     if p.contingencies:
@@ -345,9 +397,14 @@ def _render_timeline_tab(extraction: HandoffExtraction) -> None:
             continue
         st.markdown(f"### {label}")
         for pi, ti, p, t in buckets[timing]:
-            key = _task_key(fp, pi, ti)
             short = _short_id(p.identifier)
-            st.checkbox(f"**[{short}]** {t.description}", key=key)
+            _render_task_checkbox(
+                f"**[{short}]** {t.description}",
+                view="timeline",
+                fp=fp,
+                patient_idx=pi,
+                task_idx=ti,
+            )
 
 
 # --- Step 1: Input ---
@@ -522,11 +579,17 @@ if st.session_state.extraction is not None and st.session_state.html_out is not 
     #   - Print sheet: 6-card HTML grid, printable, the original output
     #   - Shift mode: per-patient mobile-friendly checklist
     #   - Timeline: cross-patient time-bucketed checklist
-    # Shift mode + Timeline share checkbox state via _task_key(), so a check
-    # in one view is reflected in the other.
+    # Shift mode + Timeline use per-view widget keys (required by Streamlit)
+    # but write to a shared `_task_state_key` slot via an on_change callback,
+    # so checking a task in one view also checks it in the other.
     view_tabs = st.tabs(["Print sheet", "Shift mode", "Timeline"])
 
     with view_tabs[0]:
+        # TODO(before 2026-06-01): `st.components.v1.html` is being removed.
+        # Replacement is `st.iframe(data_url, ...)` where data_url is a
+        # base64-encoded `data:text/html;base64,...` of html_out. Defer
+        # until closer to the deadline in case Streamlit ships a cleaner
+        # raw-HTML embed API with height/scroll controls.
         st.components.v1.html(st.session_state.html_out, height=1100, scrolling=True)
         col_d1, col_d2 = st.columns(2)
         with col_d1:
