@@ -36,6 +36,7 @@ except Exception:
     # No secrets.toml — fine, we'll rely on .env via load_dotenv() in extract.py
     pass
 
+from src.demo_data import DEMO_TRANSCRIPT, build_demo_extraction
 from src.extract import extract_handoff_cached, is_cached
 from src.render import render_sheet
 from src.schema import HandoffExtraction, Patient, Task, TaskTiming, Contingency
@@ -125,8 +126,8 @@ def _prime_whisper(model_size: str):
 
 st.subheader("1. Provide input")
 
-tab_upload, tab_record, tab_paste = st.tabs(
-    ["Upload audio", "Record audio", "Paste text"]
+tab_upload, tab_record, tab_paste, tab_demo = st.tabs(
+    ["Upload audio", "Record audio", "Paste text", "Demo (no API call)"]
 )
 
 with tab_upload:
@@ -178,6 +179,35 @@ with tab_paste:
         st.session_state.transcript = pasted
         st.session_state.extraction = None
         st.session_state.html_out = None
+
+with tab_demo:
+    # Showcases the app end-to-end with zero API cost and zero latency.
+    # The transcript + extraction are hard-coded in src/demo_data.py and
+    # rendered through the same render_sheet() path the live app uses, so
+    # the downstream UI (steps 2-4) is identical to a real run.
+    st.markdown(
+        "Use this tab to demo the app without calling the LLM. The transcript "
+        "below is a 3-patient handoff; clicking the button loads a pre-computed "
+        "extraction and renders the one-pager instantly."
+    )
+    st.text_area(
+        "Demo transcript (read-only)",
+        value=DEMO_TRANSCRIPT,
+        height=260,
+        key="demo_transcript_view",
+        disabled=True,
+    )
+    if st.button("Run demo extraction (instant, no API call)", type="primary", key="demo_btn"):
+        st.session_state.transcript = DEMO_TRANSCRIPT
+        demo_extraction = build_demo_extraction()
+        st.session_state.extraction = demo_extraction
+        st.session_state.html_out = render_sheet(demo_extraction)
+        # Fake metadata so the metric strip in Step 3 still renders coherently.
+        # 0 ms + "cache hit" honestly describes what just happened: no API call,
+        # instant. Switching to a real run later will overwrite these.
+        st.session_state.last_extraction_ms = 0
+        st.session_state.last_cache_hit = True
+        st.rerun()
 
 # --- Step 2: Review transcript ---
 
