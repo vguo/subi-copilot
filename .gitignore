@@ -1,0 +1,26 @@
+# Secrets — NEVER commit these
+.env
+.env.local
+.streamlit/secrets.toml
+
+# Local caches and generated outputs
+.cache/
+outputs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
