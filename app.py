@@ -593,8 +593,23 @@ if st.session_state.extraction is not None and st.session_state.html_out is not 
     st.markdown("---")
     st.subheader("3. View handoff")
 
-    # Metadata strip
-    extraction: HandoffExtraction = st.session_state.extraction
+    # Normalize extraction against the *current* schema classes.
+    # Background: Streamlit Cloud persists `st.session_state` across code
+    # deploys. After a `git push`, the Python process restarts with the new
+    # code, but `session_state.extraction` still holds Pydantic objects
+    # built against the *previous* class definitions. Even when the class
+    # body is byte-identical, the post-reload class is a different Python
+    # object — and Pydantic v2 checks type identity strictly. Passing
+    # `p.active_meds` (old Medication) into `Patient(active_meds=...)`
+    # (new Medication field) then raises:
+    #     "Input should be a valid dictionary or instance of Medication"
+    # Round-tripping through model_dump/model_validate rebuilds everything
+    # nested using the current classes, fixing the type mismatch.
+    # The write-back means we pay this cost once per deploy, not per rerun.
+    extraction: HandoffExtraction = HandoffExtraction.model_validate(
+        st.session_state.extraction.model_dump()
+    )
+    st.session_state.extraction = extraction
     n_pat = len(extraction.patients)
     elapsed = st.session_state.last_extraction_ms or 0
     cache_lbl = "cache hit" if st.session_state.last_cache_hit else "fresh extraction"
