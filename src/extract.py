@@ -50,18 +50,21 @@ LLMProvider = Literal["claude", "gemini"]
 # changes auto-invalidate the cache.
 CLAUDE_MODEL = "claude-sonnet-4-5"
 
-# Gemini model picking is unstable: Google retires versions and rate-limits
-# popular new ones aggressively on the free tier.
+# Gemini model picking is unstable: Google retires versions and the free
+# tier offering has narrowed over time.
 # - `gemini-1.5-flash` was retired in 2025 (404s).
-# - `gemini-2.5-flash` is the current flagship but the free tier hits 503s
-#   under load.
-# - `gemini-2.0-flash` is the reliable default — GA for longer, demand has
-#   moderated, free tier serves it consistently.
+# - `gemini-2.5-flash` is flagship but the free tier hits 503s under load.
+# - `gemini-2.0-flash` is now often paid-only for new projects (429 with
+#   `limit: 0` on free tier).
+# - The `-lite` variants (`gemini-2.0-flash-lite`, `gemini-2.5-flash-lite`)
+#   stay on free tier longest — slightly lower quality, but actually free.
 #
-# To override without a code push, set the GEMINI_MODEL env var (locally in
-# .env, on Streamlit Cloud in Secrets). To discover what your key can call,
-# run: `python list_gemini_models.py` from the project root.
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+# Default to `-lite` because that's what reliably works on AI Studio's free
+# tier as of 2026. Users on a paid project can override to a non-lite model
+# via the GEMINI_MODEL env var (locally in .env, on Streamlit Cloud in
+# Secrets). To discover what your key can call, run:
+#     python list_gemini_models.py
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-lite")
 
 
 def _load_prompt() -> str:
