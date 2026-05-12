@@ -105,7 +105,7 @@ with st.sidebar:
         index=0,
         format_func=lambda x: {
             "claude": "Claude Sonnet (paid, ~$0.04/patient)",
-            "gemini": "Gemini 1.5 Flash (free, AI Studio)",
+            "gemini": "Gemini 2.5 Flash (free, AI Studio)",
         }[x],
         key="llm_provider",
         help=(

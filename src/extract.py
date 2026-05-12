@@ -49,7 +49,10 @@ LLMProvider = Literal["claude", "gemini"]
 # To change models, edit here — the cache key includes the model string so
 # changes auto-invalidate the cache.
 CLAUDE_MODEL = "claude-sonnet-4-5"
-GEMINI_MODEL = "gemini-1.5-flash"
+# NOTE: gemini-1.5-flash was retired by Google in 2025. Use 2.x or later.
+# If this errors with "model not found", run the diagnostic in DEPLOY.md
+# (or src/list_gemini_models.py) to enumerate what your API key can call.
+GEMINI_MODEL = "gemini-2.5-flash"
 
 
 def _load_prompt() -> str:
