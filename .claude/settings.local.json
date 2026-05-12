@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($base = \"C:\\\\Users\\\\vince\\\\Documents\\\\MBA\\\\SubI Handoff Copilot\"; New-Item -ItemType Directory -Force -Path \"$base\\\\src\", \"$base\\\\prompts\", \"$base\\\\data\\\\synthetic_handoffs\", \"$base\\\\data\\\\gold_watchouts\", \"$base\\\\evals\", \"$base\\\\outputs\" | Select-Object FullName)"
+    ]
+  }
+}

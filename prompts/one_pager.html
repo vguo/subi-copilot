@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Handoff One-Pager</title>
+<style>
+  /* Print-first design. View in browser, then Ctrl+P -> "Save as PDF" or print. */
+
+  @page {
+    size: letter;            /* 8.5in x 11in */
+    margin: 0.25in;
+  }
+
+  :root {
+    --ink: #000;
+    --muted: #444;
+    --rule: #888;
+    --severity-bg: #eee;
+    --when-bg: #222;
+    --when-fg: #fff;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    font-size: 8pt;          /* body shrunk from 9pt -> 8pt for more content room */
+    line-height: 1.22;
+  }
+
+  /* Sheet wrapper: 2 columns x 3 rows = 6 cards. */
+  .sheet {
+    width: 8in;              /* 8.5in - 0.25in margin x 2 */
+    height: 10.5in;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(3, 1fr);
+    gap: 0.1in;
+  }
+
+  .card {
+    border: 0.6pt solid var(--ink);
+    padding: 0.1in 0.12in;
+    overflow: hidden;        /* overflow = content-fit bug, log it */
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card.blank {
+    border: 0.6pt dashed #ccc;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 0.5pt solid var(--rule);
+    padding-bottom: 2pt;
+    margin-bottom: 3pt;
+  }
+
+  /* Name/location kept at the same size as before (10pt) per spec —
+     only body content shrunk to 8pt. Anchor of the card. */
+  .ident {
+    font-weight: 700;
+    font-size: 10pt;
+  }
+
+  .severity {
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+    background: var(--severity-bg);
+    padding: 1pt 4pt;
+    border: 0.5pt solid var(--rule);
+  }
+  .severity.unstable { background: #000; color: #fff; }
+  .severity.watcher  { background: #ddd; }
+  .severity.stable   { background: #fff; }
+
+  .oneliner {
+    font-style: italic;
+    color: var(--muted);
+    margin-bottom: 3pt;
+  }
+
+  .section {
+    margin-bottom: 3pt;
+  }
+
+  .section-label {
+    font-weight: 700;
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+    color: var(--muted);
+  }
+  .section-label-inline {
+    font-weight: 700;
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+    color: var(--muted);
+  }
+
+  .exam {
+    font-size: 7.5pt;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  /* Day events / generic bullets. */
+  .bullets li::before {
+    content: "• ";
+    color: var(--muted);
+  }
+
+  /* Tasks: checkbox glyph, with time-bucket pill where present. */
+  .tasks li {
+    margin-bottom: 1pt;
+  }
+  .tasks li::before {
+    content: "☐ ";
+    color: var(--ink);
+  }
+  .when {
+    display: inline-block;
+    background: var(--when-bg);
+    color: var(--when-fg);
+    font-size: 6.5pt;
+    font-weight: 700;
+    padding: 0.5pt 3pt;
+    margin-right: 3pt;
+    border-radius: 1.5pt;
+    vertical-align: 1pt;
+    letter-spacing: 0.3pt;
+  }
+
+  /* Contingencies: trigger -> action. */
+  .conts li { margin-bottom: 1pt; }
+  .conts .trig { font-weight: 700; }
+  .conts .arrow { margin: 0 2pt; }
+
+  .footer {
+    margin-top: auto;       /* pin to bottom of card */
+    font-size: 7pt;
+    color: var(--muted);
+    border-top: 0.5pt dotted var(--rule);
+    padding-top: 2pt;
+    display: flex;
+    flex-direction: column;
+    gap: 1pt;
+  }
+  .footer .label {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3pt;
+    color: var(--ink);
+  }
+
+  .gaps {
+    font-size: 7pt;
+    color: #b00;
+    margin-top: 2pt;
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+{{CARDS}}
+</div>
+</body>
+</html>
