@@ -36,6 +36,11 @@ try:
         os.environ.setdefault("ANTHROPIC_API_KEY", st.secrets["ANTHROPIC_API_KEY"])
     if "GEMINI_API_KEY" in st.secrets:
         os.environ.setdefault("GEMINI_API_KEY", st.secrets["GEMINI_API_KEY"])
+    # Optional: override the default Gemini model from secrets without a
+    # code push. Useful when Google retires a model or rate-limits the
+    # current default; just edit Streamlit Cloud's Secrets UI and rerun.
+    if "GEMINI_MODEL" in st.secrets:
+        os.environ.setdefault("GEMINI_MODEL", st.secrets["GEMINI_MODEL"])
 except Exception:
     # No secrets.toml — fine, we'll rely on .env via load_dotenv() in extract.py
     pass
@@ -105,7 +110,7 @@ with st.sidebar:
         index=0,
         format_func=lambda x: {
             "claude": "Claude Sonnet (paid, ~$0.04/patient)",
-            "gemini": "Gemini 2.5 Flash (free, AI Studio)",
+            "gemini": "Gemini Flash (free, AI Studio)",
         }[x],
         key="llm_provider",
         help=(

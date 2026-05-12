@@ -49,10 +49,19 @@ LLMProvider = Literal["claude", "gemini"]
 # To change models, edit here — the cache key includes the model string so
 # changes auto-invalidate the cache.
 CLAUDE_MODEL = "claude-sonnet-4-5"
-# NOTE: gemini-1.5-flash was retired by Google in 2025. Use 2.x or later.
-# If this errors with "model not found", run the diagnostic in DEPLOY.md
-# (or src/list_gemini_models.py) to enumerate what your API key can call.
-GEMINI_MODEL = "gemini-2.5-flash"
+
+# Gemini model picking is unstable: Google retires versions and rate-limits
+# popular new ones aggressively on the free tier.
+# - `gemini-1.5-flash` was retired in 2025 (404s).
+# - `gemini-2.5-flash` is the current flagship but the free tier hits 503s
+#   under load.
+# - `gemini-2.0-flash` is the reliable default — GA for longer, demand has
+#   moderated, free tier serves it consistently.
+#
+# To override without a code push, set the GEMINI_MODEL env var (locally in
+# .env, on Streamlit Cloud in Secrets). To discover what your key can call,
+# run: `python list_gemini_models.py` from the project root.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
 
 def _load_prompt() -> str:
