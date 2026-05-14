@@ -1,6 +1,6 @@
-# Sub-I Handoff Co-Pilot — Build Spec
+# Handoff Copilot — Build Spec
 
-A self-contained specification for rebuilding this app from scratch. Pair this file with the synthetic handoff scripts in `data/synthetic_handoffs/` and any LLM with code-writing ability should be able to produce a working end-to-end implementation.
+A self-contained specification for rebuilding this app from scratch. (Product name: **Handoff Copilot**. Repo / Python package name: `sub-i-copilot`.) Pair this file with the synthetic handoff scripts in `data/synthetic_handoffs/` and any LLM with code-writing ability should be able to produce a working end-to-end implementation.
 
 ---
 
@@ -8,7 +8,7 @@ A self-contained specification for rebuilding this app from scratch. Pair this f
 
 **Goal.** A personal tool that turns a verbal sign-out (voice memo or pasted transcript) into a printable one-page reference sheet that an overnight intern can carry on shift. One sheet per shift, up to 6 patient cards on letter paper.
 
-**Audience.** A single sub-intern using it for their own shifts. Synthetic / training data only. No PHI, no multi-user concerns, no HIPAA scope, no auth.
+**Audience.** A single trainee (intern, resident, or sub-intern) using it for their own overnight shifts. Synthetic / training data only. No PHI, no multi-user concerns, no HIPAA scope, no auth.
 
 **Why it has to exist.** Verbal handoffs disappear the instant the day team walks out the door. The receiver re-derives clinical context all night from memory and chart-diving. A static one-pager is the cheapest possible intervention: capture what was said, structure it, print it, carry it.
 
@@ -540,7 +540,7 @@ The lazy import is important: `faster-whisper` pulls in `ctranslate2`, which is 
 ### Page-level setup
 
 ```python
-st.set_page_config(page_title="Sub-I Handoff Co-Pilot", page_icon=":clipboard:", layout="wide")
+st.set_page_config(page_title="Handoff Copilot", page_icon=":clipboard:", layout="wide")
 ```
 
 Display a **synthetic-data-only warning** as a permanent `st.warning(...)` banner at the top. This is non-negotiable since the app sends transcripts to Anthropic.

@@ -43,7 +43,7 @@ After updating the `notable_levels` field description in schema.py:
 
 ## Realism gap: synthetic scripts vs. real handoffs
 
-Sub-I noted that real voice memos will differ from the synthetic scripts in ways
+The trainee user noted that real voice memos will differ from the synthetic scripts in ways
 that matter for downstream rendering and any later supplementation logic:
 
 - **Implicit thresholds.** Real handoffs often skip thresholds that interns are
@@ -65,7 +65,7 @@ rather than fabrication).
 ## Notes on gold watchouts methodology
 
 Gold watchouts in data/gold_watchouts/gold_watchouts.md were generated with LLM
-assistance and then revised by the sub-I. This is a pragmatic choice — the primary
+assistance and then revised by the trainee user. This is a pragmatic choice — the primary
 goal of this project is learning the vibe-coding / Claude Code workflow, not
 pressure-testing clinical judgment rigorously. The gold set is still useful as a
 structured reference for Phase 7 comparison; just interpret precision/recall numbers

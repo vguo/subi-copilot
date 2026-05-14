@@ -1,6 +1,12 @@
-# Sub-I Co-Pilot: Personal Handoff Tool
+# Handoff Copilot — Original Plan
 
-*Working project doc. For me and Claude to iterate on as I build.*
+*Working project doc. For me and Claude to iterate on as I build. (The project was originally called "Sub-I Co-Pilot"; it's now Handoff Copilot. The filename stays `sub_i_copilot_plan.md` since other docs link to it.)*
+
+> **Note (2026-05-12).** This is the *original* plan, preserved as an artifact. For the current state of the app, see [`README.md`](README.md) and [`BUILD_SPEC.md`](BUILD_SPEC.md). The biggest deltas from this plan:
+> - **Watch-outs and time-bucketing collapsed into one LLM call.** The plan had three separate calls (extraction, watch-outs generation, time-bucketing). They were merged into a single extraction call by adding `Task.when` (enum) and `Contingency` (trigger/action) to the schema. Cheaper, faster, less hallucination surface.
+> - **Rendering uses HTML + browser-print, not WeasyPrint.** WeasyPrint had Windows install pain; the HTML one-pager via Ctrl+P → Save as PDF turned out to be good enough.
+> - **A UI shipped.** This plan said "no UI beyond a CLI." That changed — `app.py` is a Streamlit webapp with four input tabs (Upload / Record / Paste / Demo) and three output tabs (Print sheet / Shift mode / Timeline), deployable to Streamlit Cloud.
+> - **Eval loop is still TODO.** Phase 7 of the build order. The methodology in this doc still applies.
 
 ---
 

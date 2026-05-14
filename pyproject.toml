@@ -1,7 +1,7 @@
 [project]
 name = "sub-i-copilot"
 version = "0.1.0"
-description = "Personal handoff processing tool for sub-internship."
+description = "Handoff Copilot — personal tool for processing overnight clinical sign-outs."
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.40.0",

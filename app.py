@@ -1,4 +1,4 @@
-"""Streamlit webapp for the sub-i handoff co-pilot.
+"""Streamlit webapp for Handoff Copilot.
 
 Run locally:
     streamlit run app.py
@@ -54,11 +54,11 @@ from src.transcribe import DEFAULT_MODEL_SIZE, transcribe
 # --- Page setup ---
 
 st.set_page_config(
-    page_title="Sub-I Handoff Co-Pilot",
+    page_title="Handoff Copilot",
     page_icon=":clipboard:",
     layout="wide",
 )
-st.title("Sub-I Handoff Co-Pilot")
+st.title("Handoff Copilot")
 st.caption(
     "Voice memo or pasted transcript → structured one-pager. "
     "Designed for synthetic / training data only — see banner below."

@@ -1,8 +1,10 @@
-# sub-i-copilot
+# Handoff Copilot
 
-Personal handoff processing tool. Input: a voice memo of a verbal sign-out. Output: a printable one-page reference sheet.
+*Repo name: `sub-i-copilot`. The product is **Handoff Copilot**.*
 
-See `sub_i_copilot_plan.md` for design rationale and scope.
+Personal handoff processing tool. Input: a voice memo of a verbal sign-out. Output: a printable one-page reference sheet plus a phone-friendly shift checklist.
+
+See `sub_i_copilot_plan.md` for the original design rationale and scope.
 
 ## Status
 

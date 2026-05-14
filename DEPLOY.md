@@ -58,7 +58,7 @@ The second `git status` should show your code files but **NOT** `.env`, `.cache/
 ### 4. First real commit
 
 ```powershell
-git commit -m "Initial commit of sub-i copilot"
+git commit -m "Initial commit of Handoff Copilot"
 ```
 
 ### 5. Create a GitHub repo
